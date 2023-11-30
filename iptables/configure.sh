@@ -8,10 +8,11 @@ echo "Installo il firewall. Attendere..."
 
 DESTINATION_PATH=/etc # without / at the end
 
+cd iptables
 python3 get-netinfo-light.py
 
-cp ./iptables/rc.z-fw $DESTINATION_PATH/rc.z
-cp ./iptables/rc.z-init $DESTINATION_PATH/init.d/rc.z
+cp rc.z-fw $DESTINATION_PATH/rc.z
+cp rc.z-init $DESTINATION_PATH/init.d/rc.z
 # cp get-netinfo-light.py $DESTINATION_PATH
 # chmod 777 $DESTINATION_PATH/rc.z
 # chmod 777 $DESTINATION_PATH/rc.z
