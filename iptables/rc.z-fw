@@ -1,0 +1,100 @@
+#!/bin/sh
+
+modprobe ip_nat_ftp
+
+wan="$NetIf"
+ip="$IpAdd"
+NETMASK="$Subnet"
+WANBCAST="$BroadAdd"
+WANNET="$NetAdd"
+GATEWAY="$Gateway"
+
+echo "Starting Firewall... for $ip WANBCAST=${WANBCAST} WANNET=${WANNET}"
+echo 0 > /proc/sys/net/ipv4/ip_forward
+
+echo "--> Erasing Rules and Chains..."
+iptables -F INPUT
+iptables -F OUTPUT
+iptables -F FORWARD
+iptables -t nat -F PREROUTING
+iptables -t nat -F POSTROUTING
+iptables -t nat -F OUTPUT
+
+iptables -F icmp-acc
+iptables -X icmp-acc
+
+echo "--> Splitting..."
+iptables -N icmp-acc
+
+echo "--> Setting ICMP Rules..."
+iptables -A icmp-acc -p icmp --icmp-type echo-reply -j ACCEPT
+iptables -A icmp-acc -p icmp --icmp-type destination-unreachable -j ACCEPT
+iptables -A icmp-acc -p icmp --icmp-type source-quench -j ACCEPT
+iptables -A icmp-acc -p icmp --icmp-type time-exceeded -j ACCEPT
+iptables -A icmp-acc -p icmp --icmp-type parameter-problem -j ACCEPT
+
+#INPUT Filter
+#drop fragments & invalid packets
+iptables -A INPUT -f -j DROP
+iptables -A INPUT -m state --state INVALID -j DROP
+
+#smurf attacks - disallow ICMP to our broadcast.
+iptables -A INPUT -p icmp -i $NetIf -d $WANBCAST -j DROP
+
+#stop syn-flood, ping-o-death, & fast port scanning
+iptables -A INPUT -p tcp --tcp-flags ALL FIN,URG,PSH -j DROP
+iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+iptables -A INPUT -p tcp --tcp-flags SYN,FIN SYN,FIN -j DROP
+
+
+
+echo "--> Setting Rules from Wan to Lan..."
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+#iptables -A INPUT -s 91.142.71.192/29 -j ACCEPT        # Enrico Casa
+iptables -A INPUT -s 212.78.0.0/24 -j ACCEPT            # Uffici Promo
+#iptables -A INPUT -s 212.78.2.0/24 -j ACCEPT           # Uffici Promo
+iptables -A INPUT -s 93.94.27.238/32 -j ACCEPT          # Ufficio Briantel
+iptables -A INPUT -s 91.142.71.55 -j ACCEPT             # Ufficio Briantel
+iptables -A INPUT -s 185.74.249.98 -j ACCEPT            # Ufficio Briantel
+
+# aprite porte http e https
+#iptables -A INPUT -p tcp -d $IpAdd --dport 443 -j ACCEPT
+#iptables -A INPUT -p tcp -d $IpAdd --dport 80 -j ACCEPT
+
+
+
+# Abilita la LAN a navigare con l'indirizzo ip della WAN
+#iptables -t nat -A POSTROUTING -o $NetIf -s 192.168.89.0/24 -j MASQUERADE
+#iptables -A FORWARD -i eth1 -o $NetIf -s 192.168.89.0/24 -j ACCEPT
+
+
+# Input incondizionati dall'esterno
+#iptables -A INPUT -p TCP --dport 443  -j ACCEPT
+#iptables -A INPUT -p TCP --dport 444  -j ACCEPT
+
+
+# Permette il traffico attraverso tutte le interfacce TUN openvpn
+#iptables -A INPUT -i tun+ -j ACCEPT
+#iptables -A FORWARD -i tun+ -j ACCEPT
+#iptables -A FORWARD -o tun+ -j ACCEPT
+
+# Permette il traffico attraverso tutte le interfacce TAP openvpn
+#iptables -A FORWARD -i tap0 -j ACCEPT
+#iptables -A FORWARD -o tap0 -s 10.19.0.0/24  -j ACCEPT
+#iptables -A FORWARD -o tap0 -s 192.168.89.0/24  -j ACCEPT
+
+# ESEMPI DI NAT specifici per filtro
+#iptables -t nat -A POSTROUTING -s 10.19.0.0/24 -d 192.168.88.0/24 -j SNAT --to-source $IpAdd 
+#iptables -A FORWARD -s 10.19.0.0/24 -o $NetIf -j ACCEPT
+#iptables -A FORWARD -o $NetIf -d 10.19.0.0/24 -j ACCEPT
+
+
+# Abilito la connessione al server web dall'esterno
+#iptables -t nat -A PREROUTING -i $NetIf -d $IpAdd -p TCP --dport 80  -j DNAT --to-destination 192.168.89.254
+#iptables -A FORWARD -i $NetIf -o eth1 -d 192.168.89.254  -p TCP --dport 80 -j ACCEPT
+
+
+iptables -A INPUT -j DROP -i $NetIf
+iptables -A FORWARD -j DROP
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
