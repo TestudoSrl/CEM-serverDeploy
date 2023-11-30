@@ -16,10 +16,7 @@ cp rc.z-init $DESTINATION_PATH/init.d/rc.z
 chmod 777 $DESTINATION_PATH/rc.z
 chmod 777 $DESTINATION_PATH/init.d/rc.z
 
-# cd $DESTINATION_PATH/init.d/
-echo $DESTINATION_PATH
-
-update-rc.d $DESTINATION_PATH/init.d/rc.z start 20 2 3 4 5 . stop 20 0 1 6 .
+update-rc.d rc.z start 20 2 3 4 5 . stop 20 0 1 6 .
 echo "Installazione eseguita."
 
 # echo "Editare il file /etc/rc.z a piacere"
